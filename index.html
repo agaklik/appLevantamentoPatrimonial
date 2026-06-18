@@ -221,6 +221,27 @@ const toast = (m,ms=2200)=>{const t=$('#toast');t.textContent=m;t.classList.add(
 const norm = s => (s||'').toString().trim();
 const onlyDigits = s => norm(s).replace(/\D/g,'');
 
+/* ---------- DECODIFICAÇÃO DE ARQUIVO (UTF-8 ou Windows-1252/ANSI) ----------
+   Sistemas Windows costumam exportar em ANSI (Windows-1252). Tentamos UTF-8
+   primeiro; se aparecer o caractere de substituição (�), refazemos como 1252. */
+function decodeBytes(buffer){
+  const bytes=new Uint8Array(buffer);
+  // UTF-8 estrito: lança erro se houver byte inválido
+  try{
+    const txt=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
+    return txt;
+  }catch(e){
+    // não é UTF-8 válido -> trata como Windows-1252
+    return new TextDecoder('windows-1252').decode(bytes);
+  }
+}
+function readFileSmart(file, cb, err){
+  const rd=new FileReader();
+  rd.onload=()=>{ try{ cb(decodeBytes(rd.result)); }catch(ex){ err && err(ex); } };
+  rd.onerror=()=>err && err(rd.error);
+  rd.readAsArrayBuffer(file);
+}
+
 /* ---------- PARSER POSICIONAL (LARGURA FIXA) ----------
    Layout (posições 1-based, conforme configuração do sistema):
    1  Código da Classificação            1-10    (10)
@@ -275,10 +296,9 @@ function parsePositional(text){
 /* ---------- IMPORTAÇÃO ---------- */
 $('#csvFile').addEventListener('change',e=>{
   const f=e.target.files[0];if(!f)return;
-  const rd=new FileReader();
-  rd.onload=()=>{
+  readFileSmart(f,(text)=>{
     try{
-      DATA=parsePositional(rd.result);
+      DATA=parsePositional(text);
       if(!DATA.length){$('#importMsg').innerHTML='<p class="err">Nenhuma linha encontrada no arquivo.</p>';return;}
       // pré-preenche campos editáveis com valores originais
       DATA.forEach(it=>{it.nova_local=it.local;it.nova_local_cod=it.localCod;it.novo_estado=it.estado;it.nova_situacao=it.situacao;});
@@ -293,8 +313,7 @@ $('#csvFile').addEventListener('change',e=>{
       // leva o foco ao botão de avançar para ficar visível no celular
       setTimeout(()=>$('#btnGoSearch').scrollIntoView({block:'center',behavior:'smooth'}),200);
     }catch(err){$('#importMsg').innerHTML='<p class="err">Erro ao ler arquivo: '+err.message+'</p>';}
-  };
-  rd.readAsText(f,'UTF-8');
+  },(ex)=>{$('#importMsg').innerHTML='<p class="err">Erro ao ler arquivo: '+(ex&&ex.message||ex)+'</p>';});
 });
 
 /* ---------- IMPORTAÇÃO DE LOCALIZAÇÕES ---------- */
@@ -334,15 +353,13 @@ function parseLocCSV(text){
 
 $('#locFile').addEventListener('change',e=>{
   const f=e.target.files[0];if(!f)return;
-  const rd=new FileReader();
-  rd.onload=()=>{
+  readFileSmart(f,(text)=>{
     try{
-      LOCS=parseLocCSV(rd.result);
+      LOCS=parseLocCSV(text);
       if(!LOCS.length){$('#locMsg').innerHTML='<p class="err">Nenhuma localização encontrada no arquivo.</p>';return;}
       $('#locMsg').innerHTML=`<p style="color:var(--ok);margin-top:10px">✓ ${LOCS.length} localizações carregadas.</p>`;
     }catch(err){$('#locMsg').innerHTML='<p class="err">Erro ao ler arquivo: '+err.message+'</p>';}
-  };
-  rd.readAsText(f,'UTF-8');
+  },(ex)=>{$('#locMsg').innerHTML='<p class="err">Erro ao ler arquivo: '+(ex&&ex.message||ex)+'</p>';});
 });
 
 /* ---------- OCULTAR / REABRIR CARD DE IMPORTAÇÃO ---------- */
