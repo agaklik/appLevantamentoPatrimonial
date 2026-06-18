@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Levantamento Patrimonial</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f1ea; --surface:#ffffff; --surface2:#f0ebe0; --border:#d9d0bf;
+    --txt:#2b2a26; --muted:#8a8170; --accent:#0f766e; --accent-2:#c2410c; --ok:#15803d; --warn:#b45309; --danger:#b91c1c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);font-size:15px}
+  header{position:sticky;top:0;z-index:50;background:var(--accent);color:#fff;border-bottom:3px solid var(--accent-2);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+  header h1{font-size:17px;margin:0;font-weight:700;flex:1;min-width:140px;color:#fff}
+  .stats{font-size:12px;color:rgba(255,255,255,.85)}
+  .stats b{color:#fff}
+  main{padding:16px;max-width:760px;margin:0 auto}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  button{font:inherit;border:none;border-radius:10px;padding:11px 16px;cursor:pointer;font-weight:600;transition:.15s;display:inline-flex;align-items:center;gap:8px;justify-content:center}
+  button:active{transform:scale(.97)}
+  .btn{background:var(--accent);color:#fff}
+  .btn-2{background:var(--surface2);color:var(--txt);border:1px solid var(--border)}
+  .btn-ok{background:var(--ok);color:#fff}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn-block{width:100%}
+  label{display:block;font-size:12px;color:var(--muted);margin:0 0 5px;text-transform:uppercase;letter-spacing:.4px}
+  input,select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px;color:var(--txt);font:inherit;margin-bottom:14px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1}
+  .hidden{display:none!important}
+  .field{margin-bottom:4px}
+  .field .val{background:var(--surface2);border-radius:8px;padding:10px 12px;border:1px solid var(--border)}
+  .field-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  #scanWrap{position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:12px}
+  #scanVideo,#photoVideo{width:100%;height:100%;object-fit:cover;display:block}
+  .scanline{position:absolute;left:8%;right:8%;top:50%;height:2px;background:var(--accent-2);box-shadow:0 0 12px var(--accent-2);animation:scan 2s linear infinite}
+  @keyframes scan{0%{top:25%}50%{top:75%}100%{top:25%}}
+  .pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+  .pill.done{background:rgba(21,128,61,.14);color:var(--ok)}
+  .pill.pend{background:rgba(180,83,9,.14);color:var(--warn)}
+  .photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .thumb{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .thumb .x{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.7);color:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;font-size:13px;cursor:pointer;padding:0}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);padding:12px 20px;border-radius:10px;z-index:100;opacity:0;transition:.3s;pointer-events:none;max-width:90%}
+  .toast.show{opacity:1}
+  .empty{text-align:center;color:var(--muted);padding:40px 20px}
+  .empty svg{opacity:.4;margin-bottom:12px}
+  .search-results{max-height:240px;overflow:auto;margin-top:8px}
+  .res-item{padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .res-item:hover{border-color:var(--accent)}
+  .res-item small{color:var(--muted);display:block}
+  .checkrow{display:flex;align-items:center;gap:10px;background:var(--surface2);padding:14px;border-radius:10px;border:1px solid var(--border);margin-bottom:14px;cursor:pointer}
+  .checkrow input{width:22px;height:22px;margin:0;flex:none}
+  .checkrow span{font-weight:600}
+  .filterbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .filterbar select,.filterbar input{margin:0}
+  .err{color:var(--danger);font-size:13px}
+  .plate-box{flex:1;border:2.5px solid var(--accent-2);border-radius:12px;padding:10px 16px;background:linear-gradient(180deg,#fff,var(--surface2));box-shadow:inset 0 0 0 1px rgba(194,65,12,.12),0 2px 6px rgba(194,65,12,.12)}
+  .plate-label{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--accent-2)}
+  .plate-num{font-weight:800;letter-spacing:2px;color:var(--txt);font-variant-numeric:tabular-nums;line-height:1.05;word-break:break-all;font-size:clamp(20px,9vw,34px)}
+  #locPicker{position:relative}
+  .loc-suggest{position:absolute;left:0;right:0;top:calc(100% - 10px);z-index:30;background:var(--surface2);border:1px solid var(--accent);border-radius:9px;max-height:220px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .loc-suggest .opt{padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border)}
+  .loc-suggest .opt:last-child{border-bottom:none}
+  .loc-suggest .opt:hover,.loc-suggest .opt.active{background:var(--accent);color:#001220}
+  .loc-suggest .opt small{display:block;opacity:.7;font-size:11px}
+  .loc-suggest .opt.empty{cursor:default;color:var(--muted)}
+  .loc-suggest .opt.empty:hover{background:transparent;color:var(--muted)}
+  .loc-selected{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .loc-selected .x{background:transparent;color:var(--muted);border:none;font-size:18px;padding:0 4px;flex:none}
+  .loc-selected b{font-weight:600}
+  .loc-selected small{color:var(--muted);display:block;font-size:11px}
+</style>
+</head>
+<body>
+<header>
+  <h1>📋 Levantamento Patrimonial</h1>
+  <div class="stats" id="stats"></div>
+  <button id="btnReopenImport" class="hidden" style="padding:8px 12px;font-size:13px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4)">📂 Arquivos</button>
+  <button id="btnExport" style="padding:8px 12px;font-size:13px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4)">⬇ Exportar</button>
+</header>
+
+<main>
+  <!-- IMPORTAÇÃO -->
+  <div class="card" id="importCard">
+    <label>Importar arquivo do sistema de patrimônio</label>
+    <input type="file" id="csvFile" accept=".txt,.csv,.dat,text/plain">
+    <p style="color:var(--muted);font-size:13px;margin:8px 0 0">
+      Arquivo de layout posicional (largura fixa), 291 caracteres por linha.
+      Campos: classificação, localização, situação, estado de conservação, código do item, placa e valor atual.
+    </p>
+    <div id="importMsg"></div>
+    <button id="btnGoSearch" class="btn btn-block hidden" style="margin-top:14px;font-size:16px;padding:14px">📷 Iniciar levantamento →</button>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+
+    <label>Importar relação de localizações <span style="text-transform:none;color:var(--muted)">(opcional)</span></label>
+    <input type="file" id="locFile" accept=".txt,.csv,.dat,text/plain,text/csv">
+    <p style="color:var(--muted);font-size:13px;margin:8px 0 0">
+      Arquivo no formato <code>código;descrição</code> ou <code>código TAB descrição</code> (com ou sem cabeçalho).
+      Habilita a escolha da localização por lista de busca no levantamento.
+    </p>
+    <div id="locMsg"></div>
+  </div>
+
+  <!-- BUSCA / SCANNER -->
+  <div class="card hidden" id="searchCard">
+    <div class="row" style="margin-bottom:14px">
+      <button class="btn" id="btnScan">📷 Ler código de barras</button>
+      <button class="btn-2" id="btnFilterToggle">📂 Listar todos</button>
+    </div>
+    <label>Buscar pelo número da placa</label>
+    <div class="row">
+      <input type="search" id="plateInput" inputmode="numeric" placeholder="Digite a placa..." style="margin:0">
+      <button class="btn-2" id="btnSearch" style="flex:none">Buscar</button>
+    </div>
+    <div id="scanWrap" class="hidden">
+      <video id="scanVideo" playsinline></video>
+      <div class="scanline"></div>
+    </div>
+    <button class="btn-ghost btn-block hidden" id="btnStopScan" style="margin-top:8px">Parar leitura</button>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+
+  <!-- DETALHE DO BEM -->
+  <div class="card hidden" id="detailCard">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px">
+      <div class="plate-box">
+        <div class="plate-label">Placa do bem</div>
+        <div class="plate-num" id="dPlaca"></div>
+      </div>
+      <span class="pill" id="dStatus"></span>
+    </div>
+
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="field"><div class="field-label">Código do Item</div><div class="val" id="dCodigo"></div></div>
+      <div class="field"><div class="field-label">Cód. Classificação</div><div class="val" id="dClassCod"></div></div>
+    </div>
+    <div class="field" style="margin-bottom:14px"><div class="field-label">Descrição</div><div class="val" id="dDesc"></div></div>
+    <div class="field" style="margin-bottom:14px"><div class="field-label">Classificação</div><div class="val" id="dClassif"></div></div>
+    <div class="field" style="margin-bottom:14px"><div class="field-label">Valor atual</div><div class="val" id="dValor"></div></div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+
+    <label>Localização</label>
+    <div id="locPicker">
+      <input type="text" id="fLocal" autocomplete="off" placeholder="Digite para buscar a localização...">
+      <div id="locSuggest" class="loc-suggest hidden"></div>
+    </div>
+    <div id="locSelected" class="loc-selected hidden"></div>
+
+    <div class="grid2">
+      <div>
+        <label>Estado de conservação</label>
+        <select id="fEstado">
+          <option value="">—</option>
+          <option>Ótimo</option><option>Bom</option><option>Regular</option>
+          <option>Ruim</option><option>Inservível</option>
+        </select>
+      </div>
+      <div>
+        <label>Situação</label>
+        <select id="fSituacao">
+          <option value="">—</option>
+          <option>Localizado</option><option>Não localizado</option>
+          <option>Em uso</option><option>Ocioso</option><option>Em manutenção</option>
+          <option>Baixado</option><option>Transferido</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Registro fotográfico</label>
+    <button class="btn-2 btn-block" id="btnPhoto">📸 Tirar foto</button>
+    <div id="photoCamWrap" class="hidden" style="margin-top:10px">
+      <div id="scanWrap2" style="position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3">
+        <video id="photoVideo" playsinline></video>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn-ok" id="btnCapture">✓ Capturar</button>
+        <button class="btn-ghost" id="btnCancelPhoto" style="flex:none">Cancelar</button>
+      </div>
+    </div>
+    <div class="photos" id="photoList"></div>
+
+    <label class="checkrow" style="margin-top:18px" for="fDone">
+      <input type="checkbox" id="fDone">
+      <span>Levantamento deste item concluído</span>
+    </label>
+
+    <div class="row">
+      <button class="btn btn-block" id="btnSave">💾 Salvar item</button>
+      <button class="btn-ghost" id="btnBack" style="flex:none">Voltar</button>
+    </div>
+  </div>
+</main>
+
+<canvas id="canvas" class="hidden"></canvas>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let DATA = [];            // array de itens
+let MAP = {};             // placa -> item
+let LOCS = [];            // [{cod, desc}] relação de localizações (importada por arquivo)
+let current = null;       // item em edição
+let codeReader = null;    // ZXing
+let photoStream = null;
+
+const toast = (m,ms=2200)=>{const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),ms);};
+const norm = s => (s||'').toString().trim();
+const onlyDigits = s => norm(s).replace(/\D/g,'');
+
+/* ---------- PARSER POSICIONAL (LARGURA FIXA) ----------
+   Layout (posições 1-based, conforme configuração do sistema):
+   1  Código da Classificação            1-10    (10)
+   2  Descrição da Classificação        11-110  (100)
+   3  Código da Localização Atual      111-120   (10)
+   4  Descrição da Localização         121-160   (40)
+   5  Código da Situação               161-165    (5)
+   6  Descrição da Situação            166-205   (40)
+   7  Código do Estado de Conservação  206-210    (5)
+   8  Descrição do Estado de Conserv.  211-250   (40)
+   9  Código do Item                   251-260   (10)
+   10 Placa                            261-272   (12)
+   11 Valor Atual                      273-291   (19)
+   12 Descrição Reduzida do Item       292-391  (100)
+*/
+const LAYOUT={
+  classCod:[1,10], classDesc:[11,110],
+  localCod:[111,120], localDesc:[121,160],
+  sitCod:[161,165], sitDesc:[166,205],
+  estCod:[206,210], estDesc:[211,250],
+  codigo:[251,260], placa:[261,272], valor:[273,291],
+  descricao:[292,391]
+};
+const cut=(line,[ini,fim])=>line.substring(ini-1,fim).trim();
+
+function parsePositional(text){
+  text=text.replace(/^\uFEFF/,'');
+  const lines=text.split(/\r\n|\n|\r/).filter(l=>l.trim()!=='');
+  const stripZeros=s=>s.replace(/^0+(?=\d)/,'');
+  return lines.map((line,idx)=>{
+    const valorRaw=cut(line,LAYOUT.valor);
+    return {
+      classCod:stripZeros(cut(line,LAYOUT.classCod)),
+      classif:cut(line,LAYOUT.classDesc),
+      localCod:cut(line,LAYOUT.localCod),
+      local:cut(line,LAYOUT.localDesc),
+      sitCod:cut(line,LAYOUT.sitCod),
+      situacao:cut(line,LAYOUT.sitDesc),
+      estCod:cut(line,LAYOUT.estCod),
+      estado:cut(line,LAYOUT.estDesc),
+      codigo:stripZeros(cut(line,LAYOUT.codigo)),
+      placa:stripZeros(cut(line,LAYOUT.placa)),
+      valor:valorRaw,
+      descricao:cut(line,LAYOUT.descricao),
+      // campos de levantamento
+      nova_local:'', nova_local_cod:'', novo_estado:'', nova_situacao:'',
+      concluido:false, fotos:[], _idx:idx, _len:line.length
+    };
+  });
+}
+
+/* ---------- IMPORTAÇÃO ---------- */
+$('#csvFile').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      DATA=parsePositional(rd.result);
+      if(!DATA.length){$('#importMsg').innerHTML='<p class="err">Nenhuma linha encontrada no arquivo.</p>';return;}
+      // pré-preenche campos editáveis com valores originais
+      DATA.forEach(it=>{it.nova_local=it.local;it.nova_local_cod=it.localCod;it.novo_estado=it.estado;it.nova_situacao=it.situacao;});
+      MAP={};DATA.forEach(it=>{if(it.placa)MAP[onlyDigits(it.placa)]=it;});
+      // alerta se o tamanho das linhas não bate com o layout esperado (291)
+      const fora=DATA.filter(it=>it._len<291).length;
+      const aviso=fora>0?` <span style="color:var(--warn)">(${fora} linha(s) menores que o esperado — confira o layout)</span>`:'';
+      $('#importMsg').innerHTML=`<p style="color:var(--ok);margin-top:10px">✓ ${DATA.length} itens carregados.${aviso}</p>`;
+      $('#searchCard').classList.remove('hidden');
+      $('#btnGoSearch').classList.remove('hidden');
+      updateStats();
+      // leva o foco ao botão de avançar para ficar visível no celular
+      setTimeout(()=>$('#btnGoSearch').scrollIntoView({block:'center',behavior:'smooth'}),200);
+    }catch(err){$('#importMsg').innerHTML='<p class="err">Erro ao ler arquivo: '+err.message+'</p>';}
+  };
+  rd.readAsText(f,'UTF-8');
+});
+
+/* ---------- IMPORTAÇÃO DE LOCALIZAÇÕES ---------- */
+function parseLocCSV(text){
+  text=text.replace(/^\uFEFF/,'');
+  const lines=text.split(/\r\n|\n|\r/).filter(l=>l.trim()!=='');
+  if(!lines.length) return [];
+  // detecta separador: TAB, ; ou ,
+  const l0=lines[0];
+  let delim='\t';
+  if(!l0.includes('\t')) delim=(l0.match(/;/g)||[]).length >= (l0.match(/,/g)||[]).length ? ';' : ',';
+  const splitLine=l=>{
+    // suporte simples a aspas
+    const out=[];let cur='',q=false;
+    for(let i=0;i<l.length;i++){const ch=l[i];
+      if(q){if(ch==='"'){if(l[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=ch;}
+      else{if(ch==='"')q=true;else if(ch===delim){out.push(cur);cur='';}else cur+=ch;}}
+    out.push(cur);return out.map(c=>c.trim());
+  };
+  const stripZeros=s=>s.replace(/^0+(?=\d)/,'');
+  let rows=lines.map(splitLine);
+  // detecta e remove cabeçalho (se a 1ª linha não tiver número no 1º campo)
+  if(rows.length && !/\d/.test(rows[0][0])) rows=rows.slice(1);
+  const seen={};
+  const out=[];
+  rows.forEach(r=>{
+    let cod,desc;
+    if(r.length>=2){cod=stripZeros(r[0]);desc=r.slice(1).join(' ').trim();}
+    else{cod='';desc=(r[0]||'').trim();}
+    if(!desc && !cod) return;
+    const key=cod+'|'+desc;
+    if(seen[key])return;seen[key]=1;
+    out.push({cod,desc});
+  });
+  return out;
+}
+
+$('#locFile').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      LOCS=parseLocCSV(rd.result);
+      if(!LOCS.length){$('#locMsg').innerHTML='<p class="err">Nenhuma localização encontrada no arquivo.</p>';return;}
+      $('#locMsg').innerHTML=`<p style="color:var(--ok);margin-top:10px">✓ ${LOCS.length} localizações carregadas.</p>`;
+    }catch(err){$('#locMsg').innerHTML='<p class="err">Erro ao ler arquivo: '+err.message+'</p>';}
+  };
+  rd.readAsText(f,'UTF-8');
+});
+
+/* ---------- OCULTAR / REABRIR CARD DE IMPORTAÇÃO ---------- */
+$('#btnGoSearch').addEventListener('click',()=>{
+  $('#importCard').classList.add('hidden');
+  $('#btnReopenImport').classList.remove('hidden');
+  window.scrollTo({top:0,behavior:'smooth'});
+  $('#plateInput').focus();
+});
+$('#btnReopenImport').addEventListener('click',()=>{
+  $('#importCard').classList.remove('hidden');
+  $('#btnReopenImport').classList.add('hidden');
+  window.scrollTo(0,0);
+});
+
+function updateStats(){
+  const done=DATA.filter(i=>i.concluido).length;
+  $('#stats').innerHTML=`<b>${done}</b>/${DATA.length} concluídos`;
+}
+
+/* ---------- BUSCA ---------- */
+function openByPlate(plate){
+  const it=MAP[onlyDigits(plate)];
+  if(!it){toast('Placa '+plate+' não encontrada');return false;}
+  openDetail(it);return true;
+}
+$('#btnSearch').addEventListener('click',()=>{const v=$('#plateInput').value;if(v)openByPlate(v);});
+$('#plateInput').addEventListener('keydown',e=>{if(e.key==='Enter'){const v=$('#plateInput').value;if(v)openByPlate(v);}});
+
+$('#btnFilterToggle').addEventListener('click',()=>{
+  const box=$('#searchResults');
+  if(box.dataset.open==='1'){box.innerHTML='';box.dataset.open='0';return;}
+  renderList(DATA);box.dataset.open='1';
+});
+function renderList(list){
+  const box=$('#searchResults');
+  if(!list.length){box.innerHTML='<div class="empty">Nenhum item.</div>';return;}
+  box.innerHTML=list.map(it=>`
+    <div class="res-item" data-p="${it.placa}">
+      <div><b>${it.placa||'(sem placa)'}</b><small>${it.descricao||it.classif||'—'}</small></div>
+      <span class="pill ${it.concluido?'done':'pend'}">${it.concluido?'OK':'Pend.'}</span>
+    </div>`).join('');
+  box.querySelectorAll('.res-item').forEach(el=>el.addEventListener('click',()=>openByPlate(el.dataset.p)));
+}
+
+/* ---------- SCANNER CÓDIGO DE BARRAS ---------- */
+$('#btnScan').addEventListener('click',startScan);
+$('#btnStopScan').addEventListener('click',stopScan);
+
+async function startScan(){
+  if(!window.ZXing){toast('Biblioteca de leitura indisponível (sem internet).');return;}
+  $('#scanWrap').classList.remove('hidden');
+  $('#btnStopScan').classList.remove('hidden');
+  try{
+    codeReader=new ZXing.BrowserMultiFormatReader();
+    const devices=await codeReader.listVideoInputDevices();
+    let devId=null;
+    const back=devices.find(d=>/back|traseira|rear|environment/i.test(d.label));
+    devId=back?back.deviceId:(devices[devices.length-1]?.deviceId||null);
+    codeReader.decodeFromVideoDevice(devId,'scanVideo',(result,err)=>{
+      if(result){
+        const txt=result.getText();
+        stopScan();
+        $('#plateInput').value=txt;
+        if(navigator.vibrate)navigator.vibrate(120);
+        openByPlate(txt);
+      }
+    });
+  }catch(e){toast('Não foi possível acessar a câmera');stopScan();}
+}
+function stopScan(){
+  if(codeReader){try{codeReader.reset();}catch(e){}codeReader=null;}
+  $('#scanWrap').classList.add('hidden');
+  $('#btnStopScan').classList.add('hidden');
+}
+
+/* ---------- DETALHE ---------- */
+function fmtMoney(v){
+  if(!v)return '—';
+  let s=v.trim();
+  // formato BR: 1.234,56  -> remove pontos de milhar, troca vírgula por ponto
+  if(/,/.test(s)) s=s.replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s);
+  if(isNaN(n))return v;
+  return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}
+function openDetail(it){
+  current=it;
+  $('#searchCard').classList.add('hidden');
+  $('#detailCard').classList.remove('hidden');
+  const placa=it.placa||'—';
+  const el=$('#dPlaca');
+  el.textContent=placa;
+  // fonte responsiva ao comprimento: até 6 dígitos usa o tamanho do clamp;
+  // a partir daí reduz para caber sem estourar o quadro
+  const n=placa.length;
+  el.style.fontSize = n<=6 ? '' : (n<=8?'28px':n<=10?'24px':n<=12?'20px':'17px');
+  el.style.letterSpacing = n>10?'1px':'2px';
+  $('#dCodigo').textContent=it.codigo||'—';
+  $('#dClassCod').textContent=it.classCod||'—';
+  $('#dDesc').textContent=it.descricao||'—';
+  $('#dClassif').textContent=it.classif||'—';
+  $('#dValor').textContent=fmtMoney(it.valor);
+  renderLocField();
+  setSelect('#fEstado',it.novo_estado);
+  setSelect('#fSituacao',it.nova_situacao);
+  $('#fDone').checked=it.concluido;
+  renderPhotos();
+  updateStatusPill();
+  window.scrollTo(0,0);
+}
+function setSelect(sel,val){
+  const el=$(sel);const opts=[...el.options].map(o=>o.value);
+  if(val && !opts.includes(val)){const o=document.createElement('option');o.value=val;o.textContent=val;el.appendChild(o);}
+  el.value=val||'';
+}
+
+/* ---------- SELETOR DE LOCALIZAÇÃO ---------- */
+let locActiveIdx=-1;
+function renderLocField(){
+  const inp=$('#fLocal'), sel=$('#locSelected'), sug=$('#locSuggest');
+  sug.classList.add('hidden');sug.innerHTML='';locActiveIdx=-1;
+  // mostra a localização atual como "chip" selecionado
+  const desc=current.nova_local||'', cod=current.nova_local_cod||'';
+  if(desc||cod){
+    sel.classList.remove('hidden');
+    sel.innerHTML=`<div><b>${desc||'(sem descrição)'}</b><small>Código: ${cod||'—'}</small></div>
+      <button class="x" id="locClear" title="Trocar">✕</button>`;
+    inp.classList.add('hidden');inp.value='';
+    $('#locClear').onclick=()=>{ // entra em modo de busca (mantém valor atual até escolher outro)
+      sel.classList.add('hidden');inp.classList.remove('hidden');inp.value='';inp.focus();
+    };
+  }else{
+    sel.classList.add('hidden');inp.classList.remove('hidden');inp.value='';
+  }
+}
+function locFilter(q){
+  q=q.trim().toLowerCase();
+  if(!LOCS.length) return [];
+  if(!q) return LOCS.slice(0,50);
+  const qn=q.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  return LOCS.filter(l=>{
+    const t=(l.cod+' '+l.desc).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return t.includes(qn);
+  }).slice(0,50);
+}
+function showLocSuggest(){
+  const inp=$('#fLocal'), sug=$('#locSuggest');
+  if(!LOCS.length){
+    sug.innerHTML='<div class="opt empty">Nenhuma relação de localizações importada. Você pode digitar livremente abaixo.</div>';
+    sug.classList.remove('hidden');return;
+  }
+  const list=locFilter(inp.value);
+  if(!list.length){sug.innerHTML='<div class="opt empty">Nenhuma localização encontrada</div>';sug.classList.remove('hidden');return;}
+  sug.innerHTML=list.map((l,i)=>`<div class="opt" data-i="${i}"><b>${l.desc||'(sem descrição)'}</b><small>Código: ${l.cod||'—'}</small></div>`).join('');
+  sug._list=list;locActiveIdx=-1;
+  sug.querySelectorAll('.opt[data-i]').forEach(el=>el.addEventListener('mousedown',ev=>{
+    ev.preventDefault();pickLoc(list[+el.dataset.i]);
+  }));
+  sug.classList.remove('hidden');
+}
+function pickLoc(l){
+  current.nova_local=l.desc;current.nova_local_cod=l.cod;
+  renderLocField();
+}
+$('#fLocal').addEventListener('focus',showLocSuggest);
+$('#fLocal').addEventListener('input',showLocSuggest);
+$('#fLocal').addEventListener('keydown',e=>{
+  const sug=$('#locSuggest');const opts=[...sug.querySelectorAll('.opt[data-i]')];
+  if(e.key==='ArrowDown'){e.preventDefault();locActiveIdx=Math.min(locActiveIdx+1,opts.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();locActiveIdx=Math.max(locActiveIdx-1,0);}
+  else if(e.key==='Enter'){
+    e.preventDefault();
+    if(locActiveIdx>=0 && sug._list){pickLoc(sug._list[locActiveIdx]);return;}
+    // sem relação importada ou nada destacado: aceita texto livre
+    if(!LOCS.length && $('#fLocal').value.trim()){current.nova_local=$('#fLocal').value.trim();current.nova_local_cod='';renderLocField();}
+    return;
+  }else if(e.key==='Escape'){sug.classList.add('hidden');return;}
+  else return;
+  opts.forEach((o,i)=>o.classList.toggle('active',i===locActiveIdx));
+  if(opts[locActiveIdx])opts[locActiveIdx].scrollIntoView({block:'nearest'});
+});
+$('#fLocal').addEventListener('blur',()=>{
+  // fecha sugestões; se não há relação importada, mantém o texto digitado
+  setTimeout(()=>{
+    $('#locSuggest').classList.add('hidden');
+    const v=$('#fLocal').value.trim();
+    if(v && !LOCS.length){current.nova_local=v;current.nova_local_cod='';renderLocField();}
+  },150);
+});
+function updateStatusPill(){
+  const p=$('#dStatus');
+  if(current.concluido){p.className='pill done';p.textContent='Concluído';}
+  else{p.className='pill pend';p.textContent='Pendente';}
+}
+$('#fDone').addEventListener('change',e=>{current.concluido=e.target.checked;updateStatusPill();});
+
+$('#btnBack').addEventListener('click',()=>{
+  stopPhoto();
+  $('#detailCard').classList.add('hidden');
+  $('#searchCard').classList.remove('hidden');
+  $('#plateInput').value='';$('#plateInput').focus();
+  if($('#searchResults').dataset.open==='1')renderList(DATA);
+});
+
+$('#btnSave').addEventListener('click',()=>{
+  if(!current)return;
+  // localização já foi gravada ao escolher/digitar; fallback p/ texto livre ainda no campo
+  const inp=$('#fLocal');
+  if(!inp.classList.contains('hidden') && inp.value.trim() && !LOCS.length){
+    current.nova_local=inp.value.trim();current.nova_local_cod='';
+  }
+  current.novo_estado=$('#fEstado').value;
+  current.nova_situacao=$('#fSituacao').value;
+  current.concluido=$('#fDone').checked;
+  updateStats();
+  toast('✓ Item salvo');
+  $('#btnBack').click();
+});
+
+/* ---------- FOTO ---------- */
+$('#btnPhoto').addEventListener('click',startPhoto);
+$('#btnCancelPhoto').addEventListener('click',stopPhoto);
+$('#btnCapture').addEventListener('click',capturePhoto);
+
+async function startPhoto(){
+  try{
+    photoStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+    $('#photoVideo').srcObject=photoStream;
+    await $('#photoVideo').play();
+    $('#photoCamWrap').classList.remove('hidden');
+  }catch(e){toast('Câmera indisponível');}
+}
+function stopPhoto(){
+  if(photoStream){photoStream.getTracks().forEach(t=>t.stop());photoStream=null;}
+  $('#photoCamWrap').classList.add('hidden');
+}
+function capturePhoto(){
+  const v=$('#photoVideo'),c=$('#canvas');
+  c.width=v.videoWidth;c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);
+  const data=c.toDataURL('image/jpeg',0.8);
+  current.fotos.push(data);
+  stopPhoto();renderPhotos();toast('Foto adicionada');
+}
+function renderPhotos(){
+  const box=$('#photoList');
+  box.innerHTML=current.fotos.map((d,i)=>`
+    <div class="thumb"><img src="${d}"><button class="x" data-i="${i}">×</button></div>`).join('');
+  box.querySelectorAll('.x').forEach(b=>b.addEventListener('click',()=>{
+    current.fotos.splice(+b.dataset.i,1);renderPhotos();
+  }));
+}
+
+/* ---------- EXPORTAÇÃO ---------- */
+$('#btnExport').addEventListener('click',exportAll);
+function csvEscape(v){v=(v??'').toString();return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+async function exportAll(){
+  if(!DATA.length){toast('Importe um CSV primeiro');return;}
+  toast('Gerando arquivos...');
+  const headers=['codigo_item','placa','descricao','cod_classificacao','classificacao','valor_atual',
+    'cod_local_original','local_original','cod_situacao_original','situacao_original',
+    'cod_estado_original','estado_original',
+    'cod_localizacao_levantada','localizacao_levantada','localizacao_alterada',
+    'estado_levantado','situacao_levantada',
+    'concluido','qtd_fotos','arquivos_fotos'];
+  const lines=[headers.join(';')];
+  const zip=new JSZip();
+  const folder=zip.folder('fotos');
+  const usedNames={};
+
+  for(const it of DATA){
+    const fotoNames=[];
+    it.fotos.forEach((d)=>{
+      const base=onlyDigits(it.placa)||('item_'+it.codigo)||('item_'+it._idx);
+      usedNames[base]=(usedNames[base]||0)+1;
+      const name=usedNames[base]>1?`${base}_${usedNames[base]}.jpg`:`${base}.jpg`;
+      fotoNames.push(name);
+      folder.file(name,d.split(',')[1],{base64:true});
+    });
+    const localAlterada=(it.nova_local_cod!==it.localCod || it.nova_local!==it.local)?'SIM':'NÃO';
+    lines.push([
+      it.codigo,it.placa,it.descricao,it.classCod,it.classif,it.valor,
+      it.localCod,it.local,it.sitCod,it.situacao,it.estCod,it.estado,
+      it.nova_local_cod,it.nova_local,localAlterada,
+      it.novo_estado,it.nova_situacao,
+      it.concluido?'SIM':'NÃO',it.fotos.length,fotoNames.join('|')
+    ].map(csvEscape).join(';'));
+  }
+
+  // CSV com BOM para Excel PT-BR
+  const csvBlob='\uFEFF'+lines.join('\r\n');
+  zip.file('levantamento_patrimonial.csv',csvBlob);
+
+  const blob=await zip.generateAsync({type:'blob'});
+  const ts=new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`levantamento_${ts}.zip`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('✓ Exportado (CSV + fotos)');
+}
+</script>
+</body>
+</html>
