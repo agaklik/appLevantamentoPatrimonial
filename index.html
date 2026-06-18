@@ -13,10 +13,13 @@
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);font-size:15px}
-  header{position:sticky;top:0;z-index:50;background:var(--accent);color:#fff;border-bottom:3px solid var(--accent-2);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-  header h1{font-size:17px;margin:0;font-weight:700;flex:1;min-width:140px;color:#fff}
-  .stats{font-size:12px;color:rgba(255,255,255,.85)}
+  header{position:sticky;top:0;z-index:50;background:var(--accent);color:#fff;border-bottom:3px solid var(--accent-2);padding:8px 10px;display:flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+  .hdr-center{flex:1;text-align:center;min-width:0}
+  header h1{font-size:16px;margin:0;font-weight:700;color:#fff;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stats{font-size:11px;color:rgba(255,255,255,.85);margin-top:1px}
   .stats b{color:#fff}
+  .hdr-icon{flex:none;width:40px;height:40px;padding:0;font-size:18px;border-radius:10px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center}
+  .hdr-icon.hidden{display:flex;visibility:hidden}
   main{padding:16px;max-width:760px;margin:0 auto}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
   button{font:inherit;border:none;border-radius:10px;padding:11px 16px;cursor:pointer;font-weight:600;transition:.15s;display:inline-flex;align-items:center;gap:8px;justify-content:center}
@@ -80,10 +83,12 @@
 </head>
 <body>
 <header>
-  <h1>📋 Levantamento Patrimonial</h1>
-  <div class="stats" id="stats"></div>
-  <button id="btnReopenImport" class="hidden" style="padding:8px 12px;font-size:13px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4)">📂 Arquivos</button>
-  <button id="btnExport" style="padding:8px 12px;font-size:13px;background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.4)">⬇ Exportar</button>
+  <button id="btnReopenImport" class="hdr-icon hidden" title="Arquivos" aria-label="Arquivos">📂</button>
+  <div class="hdr-center">
+    <h1>Levantamento Patrimonial</h1>
+    <div class="stats" id="stats"></div>
+  </div>
+  <button id="btnExport" class="hdr-icon" title="Exportar" aria-label="Exportar">⬇</button>
 </header>
 
 <main>
